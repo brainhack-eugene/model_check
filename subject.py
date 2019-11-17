@@ -190,7 +190,7 @@ class Subject(object):
             for filename, con in con_data.items():
                 plotting.plot_glass_brain(con, display_mode='lyrz',
                                         colorbar=True, plot_abs=False,
-                                        cmap=plotting.cm.ocean_hot, title=self.contrasts[filename])
+                                        cmap=plotting.cm.ocean_hot, title=self.id+" "+self.contrasts[filename])
 
         else:
             if pattern:
@@ -202,7 +202,7 @@ class Subject(object):
             for filename, beta in beta_data.items():
                 plotting.plot_glass_brain(beta, display_mode='lyrz',
                                         colorbar=True, plot_abs=False,
-                                        cmap=plotting.cm.ocean_hot, title=self.betas[filename])
+                                        cmap=plotting.cm.ocean_hot, title=self.id+" "+self.betas[filename])
 
 
     def apply_to_pattern(self, pattern, contrast, *args):

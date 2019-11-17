@@ -18,6 +18,7 @@ class Subject(object):
         else:
             self.basedir = path
 
+        self.id = id
         self.con_headers = {}
         self.beta_headers = {}
         self.contrasts = {}
@@ -113,7 +114,8 @@ class Subject(object):
         #calculated_vals = {}
         all_images_values = []
         for filename, img in data.items():
-            single_image_values = [filename]
+            single_image_values = [self.id]
+            single_image_values.append(filename)
             single_image_values.append(self.contrasts[filename])
 
             img_data = img.get_fdata()
@@ -123,7 +125,7 @@ class Subject(object):
 
             all_images_values.append(single_image_values)
 
-        column_names = ['filename', 'contrast']
+        column_names = ['id', 'filename', 'contrast']
         column_names.extend([fn.__name__ for fn in args])
 
 
@@ -141,7 +143,7 @@ class Subject(object):
 
 if __name__ == "__main__":
     subject_folders = [subdir for subdir in os.listdir(os.path.join(os.getcwd(), 'event')) if subdir.startswith("sub")]
-    subject = Subject(id='FP001', path='/Users/jonny/git/model_check/event')
+    subject1 = Subject(id='FP001', path='/Users/jonny/git/model_check/event')
     subject.find_contrasts('Look')
     data = subject.load_contrasts('Look', return_data=True)
 
@@ -156,6 +158,16 @@ if __name__ == "__main__":
     plotting.plot_glass_brain(data[list(data.keys())[0]], display_mode='lyrz',
                               colorbar=True, plot_abs=False,
                               cmap=plotting.cm.ocean_hot, title="test")
+
+    ids = ["FP001", "FP002"]
+    subjects = [Subject(id=id, path='/Users/jonny/git/model_check/event') for id in ids]
+    combo_data = pd.concat([s.apply_to_pattern("Look", np.mean, np.std, np.min, np.max) for s in subjects])
+
+    combo_data = []
+    for s in subjects:
+        combo_data.append(...)
+    combo_data = pd.concat(combo_data)
+
 
     subject.get_headers()
     subject.get_contrasts()

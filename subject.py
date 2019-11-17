@@ -3,6 +3,8 @@ import os
 import nibabel as nib
 import re
 from nilearn import plotting
+from nilearn.image import math_img
+import pandas as pd
 
 
 class Subject(object):
@@ -29,6 +31,9 @@ class Subject(object):
         self.con_files = sorted([con for con in os.listdir(self.path) if con.startswith('con')])
         self.beta_files = sorted([beta for beta in os.listdir(self.path) if beta.startswith('beta')])
 
+        self.get_headers()
+        self.get_contrasts()
+
     def get_headers(self):
         self.con_headers = {}
         for c_file in self.con_files:
@@ -45,6 +50,8 @@ class Subject(object):
             img = nib.load(fullpath)
             for key, val in zip(img.header.keys(), img.header.values()):
                 self.beta_headers[b_file][key] = val
+
+
 
     def get_contrasts(self):
         if not self.con_headers:
@@ -97,6 +104,38 @@ class Subject(object):
                                       colorbar=True, plot_abs=False,
                                       cmap=plotting.cm.ocean_hot, title=self.contrasts[filename])
 
+    def apply_to_pattern(self, pattern, *args):
+        """
+        args should be a list of functions
+        """
+        data = self.load_contrasts(pattern, return_data=True)
+
+        #calculated_vals = {}
+        all_images_values = []
+        for filename, img in data.items():
+            single_image_values = [filename]
+            single_image_values.append(self.contrasts[filename])
+
+            img_data = img.get_fdata()
+            img_data = img_data[np.logical_not(np.isnan(img_data))]
+
+            single_image_values.extend([fn(img_data) for fn in args])
+
+            all_images_values.append(single_image_values)
+
+        column_names = ['filename', 'contrast']
+        column_names.extend([fn.__name__ for fn in args])
+
+
+
+        df = pd.DataFrame.from_records(all_images_values, columns=column_names)
+        return df
+
+
+
+
+
+
 
 
 
@@ -105,6 +144,14 @@ if __name__ == "__main__":
     subject = Subject(id='FP001', path='/Users/jonny/git/model_check/event')
     subject.find_contrasts('Look')
     data = subject.load_contrasts('Look', return_data=True)
+
+    data = subject.load_contrasts('Look', return_data=True)
+
+    data = subject.apply_to_pattern("Look", np.mean, np.std, np.min, np.max)
+
+    data = list(data.values())
+    math_img("np.mean(img)", img=data)
+
 
     plotting.plot_glass_brain(data[list(data.keys())[0]], display_mode='lyrz',
                               colorbar=True, plot_abs=False,

@@ -24,7 +24,7 @@ class Subject(object):
             self.basedir = os.getcwd()
         else:
             if not os.path.exists(path):
-                print ‘ERROR: %s does not exist!’ % path
+                print('ERROR: %s does not exist!' % path)
             else:
                 self.basedir = path
 
@@ -35,6 +35,7 @@ class Subject(object):
         self.con_headers = {}
         self.beta_headers = {}
         self.contrasts = {}
+        self.betas = {}
         self.con_data = {}
         self.beta_data = {}
 
@@ -48,6 +49,7 @@ class Subject(object):
         # execute these functions (defined below) automatically
         self.get_headers()
         self.get_contrasts()
+        self.get_betas()
 
 
     def get_headers(self):
@@ -168,53 +170,83 @@ class Subject(object):
 
         self.beta_data = {}
         for file in load_files:
-            self.betadata[file] = nib.load(os.path.join(self.path, file))
+            self.beta_data[file] = nib.load(os.path.join(self.path, file))
 
         if return_data:
             return self.beta_data
 
 
-    def plot_data(self, con_data=None, pattern=None):
+    def plot_data(self, con_data=None, pattern=None, contrast=True):
         """
-        This function plots matching contrast files
+        This function plots matching contrast or beta files
         """
+        if contrast:
+            if pattern:
+                con_data = self.load_contrasts(pattern, return_data=True)
 
-        if pattern:
-            con_data = self.load_contrasts(pattern, return_data=True)
+            if con_data is None:
+                Exception("Need either con_data (loaded from load_contrasts) or regex pattern")
 
-        if con_data is None:
-            Exception("Need either con_data (loaded from load_contrasts) or regex pattern")
+            for filename, con in con_data.items():
+                plotting.plot_glass_brain(con, display_mode='lyrz',
+                                        colorbar=True, plot_abs=False,
+                                        cmap=plotting.cm.ocean_hot, title=self.contrasts[filename])
 
-        for filename, con in con_data.items():
-            plotting.plot_glass_brain(con, display_mode='lyrz',
-                                      colorbar=True, plot_abs=False,
-                                      cmap=plotting.cm.ocean_hot, title=self.contrasts[filename])
+        else:
+            if pattern:
+                beta_data = self.load_betas(pattern, return_data=True)
+
+            if beta_data is None:
+                Exception("Need either beta_data (loaded from load_betas) or regex pattern")
+
+            for filename, beta in beta_data.items():
+                plotting.plot_glass_brain(beta, display_mode='lyrz',
+                                        colorbar=True, plot_abs=False,
+                                        cmap=plotting.cm.ocean_hot, title=self.betas[filename])
 
 
-    def apply_to_pattern(self, pattern, *args):
+    def apply_to_pattern(self, pattern, contrast, *args):
         """
-        This function applies one or more functions to the contrast data and returns
-        a pandas dataframe.
-        Args should be a list of functions.
+        This function applies one or more functions to the contrast or beta data 
+        and returns a pandas dataframe. Args should be a list of functions.
         """
+        if contrast:
+            data = self.load_contrasts(pattern, return_data=True)
 
-        data = self.load_contrasts(pattern, return_data=True)
+            all_images_values = []
+            for filename, img in data.items():
+                single_image_values = [self.id]
+                single_image_values.append(filename)
+                single_image_values.append(self.contrasts[filename])
 
-        all_images_values = []
-        for filename, img in data.items():
-            single_image_values = [self.id]
-            single_image_values.append(filename)
-            single_image_values.append(self.contrasts[filename])
+                img_data = img.get_fdata()
+                img_data = img_data[np.logical_not(np.isnan(img_data))]
 
-            img_data = img.get_fdata()
-            img_data = img_data[np.logical_not(np.isnan(img_data))]
+                single_image_values.extend([fn(img_data) for fn in args])
 
-            single_image_values.extend([fn(img_data) for fn in args])
+                all_images_values.append(single_image_values)
 
-            all_images_values.append(single_image_values)
+            column_names = ['id', 'filename', 'contrast']
+            column_names.extend([fn.__name__ for fn in args])
+        
+        else:
+            data = self.load_betas(pattern, return_data=True)
 
-        column_names = ['id', 'filename', 'contrast']
-        column_names.extend([fn.__name__ for fn in args])
+            all_images_values = []
+            for filename, img in data.items():
+                single_image_values = [self.id]
+                single_image_values.append(filename)
+                single_image_values.append(self.betas[filename])
+
+                img_data = img.get_fdata()
+                img_data = img_data[np.logical_not(np.isnan(img_data))]
+
+                single_image_values.extend([fn(img_data) for fn in args])
+
+                all_images_values.append(single_image_values)
+
+            column_names = ['id', 'filename', 'beta']
+            column_names.extend([fn.__name__ for fn in args])
 
         df = pd.DataFrame.from_records(all_images_values, columns=column_names)
         return df

@@ -9,33 +9,52 @@ import pandas as pd
 
 class Subject(object):
     """
-    Data for a subject
+    Class for collecting the following data for subject first-level model
     """
 
     def __init__(self, id, path=None):
+        """
+        :param id: subject ID
+        :param path: path to the model directory
+        """
+
+        # define model directory path
+        # if there is no path selected, use the current working directory
         if path is None:
             self.basedir = os.getcwd()
         else:
-            self.basedir = path
+            if not os.path.exists(path):
+                print ‘ERROR: %s does not exist!’ % path
+            else:
+                self.basedir = path
 
+        # specify subject ID based on input argument id
         self.id = id
+
+        # initialize variables
         self.con_headers = {}
         self.beta_headers = {}
         self.contrasts = {}
         self.con_data = {}
         self.beta_data = {}
 
-
-
+        # specify subject model directory path
         self.path = os.path.join(self.basedir, "sub-{}".format(id))
 
+        # get list of contrast and beta files
         self.con_files = sorted([con for con in os.listdir(self.path) if con.startswith('con')])
         self.beta_files = sorted([beta for beta in os.listdir(self.path) if beta.startswith('beta')])
-
+        
+        # execute these functions (defined below) automatically
         self.get_headers()
         self.get_contrasts()
 
+
     def get_headers(self):
+        """
+        This function loads con and beta files and saves the header information as a dictionary 
+        """
+
         self.con_headers = {}
         for c_file in self.con_files:
             self.con_headers[c_file] = {}
@@ -53,18 +72,35 @@ class Subject(object):
                 self.beta_headers[b_file][key] = val
 
 
-
     def get_contrasts(self):
+        """
+        This function pulls the contrast names from the header dictionary
+        """
+
         if not self.con_headers:
             self.get_headers()
 
         for file, header in self.con_headers.items():
             self.contrasts[file] = str(header['descrip']).lstrip('b').strip('\'')
 
+    def get_betas(self):
+        """
+        This function pulls the beta names from the header dictionary
+        """
 
+        if not self.beta_headers:
+            self.get_headers()
+
+        for file, header in self.beta_headers.items():
+            self.betas[file] = str(header['descrip']).lstrip('b').strip('\'')
 
 
     def find_contrasts(self, pattern, return_contrast=False):
+        """
+        This function compares a regular expression pattern to the list of contrasts 
+        and returns the matching contrasts
+        """
+
         if not self.contrasts:
             self.get_contrasts()
 
@@ -83,7 +119,36 @@ class Subject(object):
 
         return good_contrasts
 
+    def find_betas(self, pattern, return_beta=False):
+        """
+        This function compares a regular expression pattern to the list of betas 
+        and returns the matching betas
+        """
+
+        if not self.betas:
+            self.get_betas()
+
+        good_betas =  []
+        if return_beta:
+            good_betas = {}
+
+        for file, beta in self.betas.items():
+            compiled_pattern = re.compile(pattern)
+
+            if bool(compiled_pattern.search(beta)):
+                if return_beta:
+                    good_betas[file] = beta
+                else:
+                    good_betas.append(file)
+
+        return good_betas
+
+
     def load_contrasts(self, pattern, return_data = False):
+        """
+        This function loads the matching contrast nii files
+        """
+
         load_files = self.find_contrasts(pattern)
 
         self.con_data = {}
@@ -93,7 +158,27 @@ class Subject(object):
         if return_data:
             return self.con_data
 
+
+    def load_betas(self, pattern, return_data = False):
+        """
+        This function loads the matching contrast nii files
+        """
+
+        load_files = self.find_betas(pattern)
+
+        self.beta_data = {}
+        for file in load_files:
+            self.betadata[file] = nib.load(os.path.join(self.path, file))
+
+        if return_data:
+            return self.beta_data
+
+
     def plot_data(self, con_data=None, pattern=None):
+        """
+        This function plots matching contrast files
+        """
+
         if pattern:
             con_data = self.load_contrasts(pattern, return_data=True)
 
@@ -105,13 +190,16 @@ class Subject(object):
                                       colorbar=True, plot_abs=False,
                                       cmap=plotting.cm.ocean_hot, title=self.contrasts[filename])
 
+
     def apply_to_pattern(self, pattern, *args):
         """
-        args should be a list of functions
+        This function applies one or more functions to the contrast data and returns
+        a pandas dataframe.
+        Args should be a list of functions.
         """
+
         data = self.load_contrasts(pattern, return_data=True)
 
-        #calculated_vals = {}
         all_images_values = []
         for filename, img in data.items():
             single_image_values = [self.id]
@@ -127,8 +215,6 @@ class Subject(object):
 
         column_names = ['id', 'filename', 'contrast']
         column_names.extend([fn.__name__ for fn in args])
-
-
 
         df = pd.DataFrame.from_records(all_images_values, columns=column_names)
         return df
@@ -181,8 +267,6 @@ class Multisubject(object):
 
 
 
-
-
 class Foo(object):
     def __getattribute__(self,name):
         attr = object.__getattribute__(self, name)
@@ -195,7 +279,6 @@ class Foo(object):
             return newfunc
         else:
             return attr
-
 
 
 

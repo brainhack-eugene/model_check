@@ -135,7 +135,70 @@ class Subject(object):
 
 
 
+class Multisubject(object):
+    """
+    Given a list of subjects, this object behaves like an individual Subject, but returns a dictionary of {subject_id: results}
 
+    eg. you can do
+    multisubject.load_contrasts(...) just like subject.load_contrasts(...)
+
+    Multisubjects is also subscriptable -- you can index the 0:2th subjects, as well as index by single or lists of subject ids
+
+    eg.
+    multisubject[0:2].load_contrasts(...)
+    multisubject['sub_id_1'].load_constrasts(..)
+    multisubject[['sub_id_1', 'sub_id_2']].load_contrasts(...)
+
+    """
+    def __init__(self, subjects):
+        self.subjects = subjects
+        self.subject_ids = [s.id for s in self.subjects]
+
+    def __getattr__(self, name):
+        attrs = [object.__getattribute__(sub, name) for sub in self.subjects]
+        if hasattr(attrs[0], '__call__'):
+            def newfunc(*args, **kwargs):
+                result = {}
+                for method, id in zip(attrs, self.subject_ids):
+                    result[id] = method(*args, **kwargs)
+                return result
+
+            return newfunc
+        else:
+            return attrs
+
+    def __getitem__(self, item):
+        if isinstance(item, str) or isinstance(item, bytes):
+            return_val = [s for s in self.subjects if s.id == item]
+        if isinstance(item, list):
+            return_val = [s for s in self.subjects if s.id in item]
+        else:
+            return_val = self.subjects[item]
+        if isinstance(return_val, list):
+            return Multisubject(return_val)
+        else:
+            return return_val
+
+
+
+
+multisub = Multisubject(subjects=subjects)
+
+multisub[0:2].load_contrasts('Look', return_data=True)
+
+
+class Foo(object):
+    def __getattribute__(self,name):
+        attr = object.__getattribute__(self, name)
+        if hasattr(attr, '__call__'):
+            def newfunc(*args, **kwargs):
+                print('before calling %s' %attr.__name__)
+                result = attr(*args, **kwargs)
+                print('done calling %s' %attr.__name__)
+                return result
+            return newfunc
+        else:
+            return attr
 
 
 
@@ -159,7 +222,7 @@ if __name__ == "__main__":
                               colorbar=True, plot_abs=False,
                               cmap=plotting.cm.ocean_hot, title="test")
 
-    ids = ["FP001", "FP002"]
+    ids = ["FP001", "FP002", "FP001"]
     subjects = [Subject(id=id, path='/Users/jonny/git/model_check/event') for id in ids]
     combo_data = pd.concat([s.apply_to_pattern("Look", np.mean, np.std, np.min, np.max) for s in subjects])
 
@@ -175,6 +238,9 @@ if __name__ == "__main__":
     subject.contrasts
     subject.con_headers.keys()
     subject.con_headers['con_0001.nii']
+
+
+
 
 
 

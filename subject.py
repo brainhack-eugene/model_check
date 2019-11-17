@@ -182,10 +182,6 @@ class Multisubject(object):
 
 
 
-multisub = Multisubject(subjects=subjects)
-
-multisub[0:2].load_contrasts('Look', return_data=True)
-
 
 class Foo(object):
     def __getattribute__(self,name):
@@ -238,6 +234,12 @@ if __name__ == "__main__":
     subject.contrasts
     subject.con_headers.keys()
     subject.con_headers['con_0001.nii']
+
+    multisub = Multisubject(subjects=subjects)
+
+    multisub[0:2].load_contrasts('Look', return_data=True)
+
+
 
 
 
